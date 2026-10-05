@@ -114,6 +114,12 @@ class Cache:
             self.db.execute(f"DELETE FROM {tabela} WHERE conta=? AND pasta=? AND uid=?",
                             (conta, pasta, uid))
 
+    def esvaziar_pasta(self, conta, pasta):
+        """Tira todas as mensagens da pasta da cópia local (a pasta continua sincronizada)."""
+        with self.lock, self.db:
+            for tabela in ("mensagens", "corpos"):
+                self.db.execute(f"DELETE FROM {tabela} WHERE conta=? AND pasta=?", (conta, pasta))
+
     def remover(self, conta, pasta, uids):
         with self.lock, self.db:
             for uid in uids:

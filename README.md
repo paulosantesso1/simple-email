@@ -10,11 +10,11 @@ A regra mais importante do projeto: **acessibilidade vem antes de aparência**. 
 - **Pastas:** criar, renomear, apagar e mover mensagens entre elas. Os nomes das pastas especiais (Enviados, Lixeira, Spam, Rascunhos) são reconhecidos em qualquer provedor.
 - **Ler e-mails:** a mensagem abre numa janela própria (Enter abre, Esc fecha e volta para a lista), como página web, para o NVDA navegar por títulos (H), links (K) e as outras teclas de navegação. Scripts e imagens remotas ficam bloqueados.
 - **Anexos:** lista própria na janela da mensagem, com botões para baixar o selecionado ou todos.
-- **Escrever:** novo, responder, responder a todos, encaminhar (com os anexos originais), anexar arquivos e salvar rascunho. Rascunhos podem ser reabertos para editar.
-- **Seleção múltipla:** apagar, mover e marcar como lida/não lida em várias mensagens de uma vez, com barra de progresso. Shift+Delete apaga de vez.
+- **Escrever:** novo, responder, responder a todos, encaminhar (com os anexos originais), anexar arquivos e salvar rascunho. Rascunhos podem ser reabertos para editar. Em Para, Cc e Cco, cada endereço digitado (Enter) entra numa lista, e Delete remove um por um; os anexos também aceitam seleção múltipla e Delete.
+- **Seleção múltipla:** apagar, mover e marcar como lida/não lida em várias mensagens de uma vez, com barra de progresso. Shift+Delete apaga de vez. Arquivo > Esvaziar lixeira apaga tudo da lixeira, sempre com confirmação.
 - **Catálogo de endereços:** contatos com sugestões ao digitar em Para, Cc e Cco, e opção de salvar o remetente de uma mensagem.
 - **Cópia local (SQLite):** a janela abre na hora e só busca o que mudou; mensagens já lidas abrem mesmo sem internet.
-- **Verificação automática** a cada X minutos (configurável), com som e aviso falado quando chega e-mail novo.
+- **Verificação automática** a cada X minutos (configurável), com som e aviso quando chega e-mail novo. Os avisos (e-mail enviado, rascunho salvo etc.) usam notificações do Windows, lidas pelo NVDA sem pausar a navegação.
 
 ## Requisitos
 

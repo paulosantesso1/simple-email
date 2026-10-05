@@ -291,6 +291,19 @@ class ImapClient:
             self._remover(c, uids)
         self._chamar(f)
 
+    def esvaziar_pasta(self, raw):
+        """Apaga de vez todas as mensagens da pasta. Devolve quantas eram."""
+        def f(c):
+            tipo, dados = c.select(_citar(raw))
+            if tipo != "OK":
+                raise imaplib.IMAP4.error(f"Não foi possível abrir a pasta: {dados}")
+            total = int(dados[0] or 0)
+            if total:
+                c.store("1:*", "+FLAGS", "(\\Deleted)")
+                c.expunge()
+            return total
+        return self._chamar(f)
+
     def mover(self, raw, uids, destino):
         def f(c):
             self._selecionar(c, raw)

@@ -15,6 +15,7 @@ import wx.html2
 import config
 import mailer
 import opcoes_dialog
+from avisos import APP_NAME, avisar
 from cache import Cache
 from compose_dialog import ID_RASCUNHO, ComposeDialog
 from contatos_dialog import ContatosDialog, salvar_remetente
@@ -22,29 +23,9 @@ from imap_client import ImapClient, encontrar_links
 from opcoes_dialog import AtalhosDialog, OpcoesDialog
 from render import montar_pagina
 
-APP_NAME = "Simple Email"
-
 # Cada tarefa em segundo plano guarda a conta que estava ativa quando foi pedida,
 # para que trocar de conta no meio não leve a operação para o servidor errado.
 _ctx = threading.local()
-
-
-def avisar(texto, pai):
-    """Aviso que o NVDA lê ao aparecer e que se fecha sozinho, sem precisar de OK.
-    Enter ou Esc também fecham, se quiser adiantar."""
-    dlg = wx.Dialog(pai, title=APP_NAME)
-    rotulo = wx.StaticText(dlg, label=texto)
-    ok = wx.Button(dlg, wx.ID_OK, "OK")
-    caixa = wx.BoxSizer(wx.VERTICAL)
-    caixa.Add(rotulo, 0, wx.ALL, 16)
-    caixa.Add(ok, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.ALIGN_CENTER, 16)
-    dlg.SetSizerAndFit(caixa)
-    dlg.CentreOnParent()
-    ok.SetDefault()
-    dlg.SetEscapeId(wx.ID_OK)
-    wx.CallLater(2000, lambda: dlg.EndModal(wx.ID_OK) if dlg.IsModal() else None)
-    dlg.ShowModal()
-    dlg.Destroy()
 
 
 def texto_da_linha(m):
@@ -547,6 +528,7 @@ class MainFrame(wx.Frame):
         self._item(m_arquivo, "&Verificar e-mails\tF5", self.on_verificar)
         self._item(m_arquivo, "Pró&xima conta\tCtrl+PgDn", lambda e: self._mover_conta(1))
         self._item(m_arquivo, "Conta a&nterior\tCtrl+PgUp", lambda e: self._mover_conta(-1))
+        self._item(m_arquivo, "Esvaziar &lixeira...", lambda e: self.esvaziar_lixeira())
         m_arquivo.AppendSeparator()
         self._item(m_arquivo, "&Sair\tAlt+F4", lambda e: self.Close())
         barra.Append(m_arquivo, "&Arquivo")
@@ -1034,10 +1016,7 @@ class MainFrame(wx.Frame):
             except Exception:  # noqa: BLE001
                 wx.Bell()
         if opcoes_dialog.opcao("avisar_com_janela"):
-            if wx.GetActiveWindow() is self:  # sem janela aberta por cima: o aviso não atrapalha
-                avisar(texto, self)
-            else:
-                wx.adv.NotificationMessage(APP_NAME, texto, parent=self).Show()
+            avisar(texto, self)
 
     def abrir_opcoes(self):
         dlg = OpcoesDialog(self)
@@ -1331,6 +1310,39 @@ class MainFrame(wx.Frame):
         self.SetStatusText(fim)
         self._em_lote("Marcando mensagens", [m["uid"] for m in msgs],
                       lambda lote: self.imap.marcar_lida(pasta["raw"], lote, lida), fim)
+
+    def esvaziar_lixeira(self):
+        """Arquivo > Esvaziar lixeira. A pergunta aparece sempre; a caixa de seleção liga ou
+        desliga o aviso de Shift+Delete (a mesma opção de Ferramentas > Opções)."""
+        if not self.conta:
+            return
+        lixeira = self._pasta_raw("Lixeira")
+        if not lixeira:
+            return wx.MessageBox("Não encontrei a lixeira desta conta.", APP_NAME,
+                                 wx.OK | wx.ICON_WARNING, self)
+        email = self.conta["email"]
+        dlg = wx.RichMessageDialog(
+            self, f"Esvaziar a lixeira de {email}? Todas as mensagens dela serão apagadas "
+            "de vez e não poderão ser recuperadas.", APP_NAME,
+            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING)
+        dlg.ShowCheckBox("&Sempre perguntar antes de apagar de vez", opcoes_dialog.opcao("perguntar_apagar_de_vez"))
+        r = dlg.ShowModal()
+        config.salvar_opcao("perguntar_apagar_de_vez", dlg.IsCheckBoxChecked())
+        dlg.Destroy()
+        if r != wx.ID_YES:
+            return self.lista.SetFocus()
+        self.SetStatusText("Esvaziando a lixeira...")
+
+        def pronto(total):
+            self.cache.esvaziar_pasta(email, lixeira)
+            if self.conta_atual and self.conta_atual["email"] == email and self.pasta_exibida == lixeira:
+                self.mensagens = []
+                self.lista.DeleteAllItems()
+            self.SetStatusText("Lixeira vazia.")
+            avisar("A lixeira já estava vazia." if total == 0 else "Lixeira esvaziada.", self)
+            self.lista.SetFocus()
+
+        self._em_thread(lambda: self.imap.esvaziar_pasta(lixeira), pronto)
 
     # ---------- pastas ----------
     def nova_pasta(self):

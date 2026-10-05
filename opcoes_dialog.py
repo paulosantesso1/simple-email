@@ -7,6 +7,7 @@ PADROES = {
     "intervalo_verificacao": 5,
     "avisar_com_som": True,
     "avisar_com_janela": True,
+    "avisar_com_notificacao": True,
     "perguntar_apagar_de_vez": True,
 }
 
@@ -62,15 +63,19 @@ class OpcoesDialog(wx.Dialog):
         self.som = wx.CheckBox(self, label="Tocar um &som quando chegar e-mail novo")
         self.som.SetValue(bool(opcao("avisar_com_som")))
         self.janela = wx.CheckBox(
-            self, label="Mostrar um &aviso rápido, lido pelo leitor de tela, quando chegar e-mail novo")
+            self, label="Mostrar um &aviso, lido pelo leitor de tela, quando chegar e-mail novo")
         self.janela.SetValue(bool(opcao("avisar_com_janela")))
+        self.notificacao = wx.CheckBox(
+            self, label="Mostrar os avisos (e-mail enviado, rascunho salvo...) como &notificação "
+            "do sistema, sem pausar a navegação")
+        self.notificacao.SetValue(bool(opcao("avisar_com_notificacao")))
         self.perguntar = wx.CheckBox(self, label="&Perguntar antes de apagar mensagens de vez")
         self.perguntar.SetValue(bool(opcao("perguntar_apagar_de_vez")))
 
         raiz = wx.BoxSizer(wx.VERTICAL)
         raiz.Add(r1, 0, wx.LEFT | wx.RIGHT | wx.TOP, 12)
         raiz.Add(self.intervalo, 0, wx.ALL, 12)
-        for c in (self.som, self.janela, self.perguntar):
+        for c in (self.som, self.janela, self.notificacao, self.perguntar):
             raiz.Add(c, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
         raiz.Add(self.CreateStdDialogButtonSizer(wx.OK | wx.CANCEL), 0, wx.ALL | wx.ALIGN_RIGHT, 12)
         self.SetSizerAndFit(raiz)
@@ -80,6 +85,7 @@ class OpcoesDialog(wx.Dialog):
         config.salvar_opcao("intervalo_verificacao", self.intervalo.GetValue())
         config.salvar_opcao("avisar_com_som", self.som.GetValue())
         config.salvar_opcao("avisar_com_janela", self.janela.GetValue())
+        config.salvar_opcao("avisar_com_notificacao", self.notificacao.GetValue())
         config.salvar_opcao("perguntar_apagar_de_vez", self.perguntar.GetValue())
 
 
