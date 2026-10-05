@@ -102,6 +102,7 @@ class CampoEnderecos:
         self._atualizar(escolhidos[0])
         if self.itens:
             self.lista.SetFocus()
+        avisar("Deletado." if len(escolhidos) == 1 else f"{len(escolhidos)} deletados.", self.dialogo)
 
     def on_tecla(self, evento):
         k = evento.GetKeyCode()

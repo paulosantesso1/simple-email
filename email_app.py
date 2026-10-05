@@ -600,6 +600,15 @@ class MainFrame(wx.Frame):
         self.arvore.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_arvore_ativada)
         self.lista.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_abrir)
         self.lista.Bind(wx.EVT_SIZE, self.on_lista_tamanho)
+        self.lista.Bind(wx.EVT_KEY_DOWN, self.on_tecla_lista)
+
+    def on_tecla_lista(self, evento):
+        """Ctrl+A seleciona todas as mensagens da pasta."""
+        if evento.ControlDown() and evento.GetKeyCode() in (ord("A"), ord("a")):
+            for i in range(self.lista.GetItemCount()):
+                self.lista.Select(i)
+        else:
+            evento.Skip()
 
     def on_lista_tamanho(self, evento):
         evento.Skip()
