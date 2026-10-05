@@ -7,6 +7,8 @@ from email import policy
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, getaddresses, make_msgid
 
+import oauth
+
 
 def _prefixar(assunto, tipo):
     padrao = r"(?i)^(re|res)\s*:" if tipo == "re" else r"(?i)^(fwd?|enc)\s*:"
@@ -123,6 +125,9 @@ def montar(conta, d, incluir_bcc=False):
 
 def enviar(conta, senha, msg, destinos):
     host, porta = conta["smtp_host"], int(conta["smtp_porta"])
+    cadeia = None
+    if conta.get("auth") == "oauth":
+        cadeia = oauth.cadeia_xoauth2(conta["email"], oauth.token_de_acesso(conta))
     contexto = ssl.create_default_context()
     if porta == 465:
         servidor = smtplib.SMTP_SSL(host, porta, context=contexto, timeout=30)
@@ -131,5 +136,8 @@ def enviar(conta, senha, msg, destinos):
     with servidor:
         if porta != 465:
             servidor.starttls(context=contexto)
-        servidor.login(conta["email"], senha)
+        if cadeia:
+            servidor.auth("XOAUTH2", oauth.autenticador(cadeia), initial_response_ok=True)
+        else:
+            servidor.login(conta["email"], senha)
         servidor.send_message(msg, to_addrs=destinos)

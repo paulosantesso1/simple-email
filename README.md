@@ -38,9 +38,20 @@ Depois da instalação, o arquivo `Simple Email.bat` abre o programa sem janela 
 
 Na primeira vez, o programa pede os dados da conta. Os servidores de Gmail, Outlook/Hotmail, Yahoo, UOL, BOL e Terra são preenchidos sozinhos.
 
+- **Outlook, Hotmail e Live:** use o botão **Entrar pelo navegador** no diálogo de conta (OAuth 2.0). O programa abre a página de login da Microsoft, você aceita o acesso e volta; não é preciso senha. Exige o registro do aplicativo, descrito em "Configurar o login OAuth" abaixo.
 - **Gmail:** não aceita a senha normal. É preciso uma **senha de app** (exige a verificação em duas etapas ligada). O diálogo de conta explica o passo a passo e traz o link: <https://myaccount.google.com/apppasswords>.
-- **Outlook/Hotmail:** a Microsoft passou a exigir login moderno (OAuth), que ainda não é suportado.
-- As senhas ficam no **Gerenciador de Credenciais do Windows** (biblioteca `keyring`), nunca em arquivo de texto.
+- **Outros provedores:** senha comum (no Yahoo, também uma senha de app).
+- Senhas e tokens do OAuth ficam no **Gerenciador de Credenciais do Windows** (biblioteca `keyring`), nunca em arquivo de texto.
+
+## Configurar o login OAuth
+
+O OAuth da Microsoft exige um aplicativo registrado, de graça e uma só vez. Não há publicação nem verificação. O programa lê o ID do aplicativo de `oauth.py` (`CLIENT_ID`) ou, sem editar o código, de `%APPDATA%\SimpleEmail\opcoes.json`, na chave `oauth_microsoft_client_id`. O login usa o fluxo de código com PKCE e retorno em `localhost`.
+
+No [Microsoft Entra](https://entra.microsoft.com), em Registros de aplicativo:
+1. Novo registro. Tipos de conta: "contas em qualquer diretório organizacional e contas pessoais da Microsoft".
+2. Em Autenticação, adicione a plataforma "Aplicativos móveis e de área de trabalho" com o endereço `http://localhost` e ative "Permitir fluxos de cliente público".
+3. Em Permissões de API, "APIs que minha organização usa", escolha Office 365 Exchange Online, permissões delegadas `IMAP.AccessAsUser.All` e `SMTP.Send`.
+4. Copie o "ID do aplicativo (cliente)" para `oauth_microsoft_client_id`.
 
 ## Atalhos principais
 
@@ -78,7 +89,8 @@ Tudo em `%APPDATA%\SimpleEmail`:
 | `imap_client.py` | Conexão IMAP: pastas, sincronização, organização |
 | `mailer.py` | Montagem e envio (SMTP), respostas e encaminhamentos |
 | `cache.py` | Cópia local em SQLite |
-| `config.py` | Contas, senhas (keyring) e opções |
+| `config.py` | Contas, senhas e tokens (keyring) e opções |
+| `oauth.py` | Login OAuth 2.0 (Microsoft) e XOAUTH2 |
 | `render.py` | Página HTML segura exibida na leitura |
 | `compose_dialog.py` | Janela de escrever |
 | `contatos.py`, `contatos_dialog.py` | Catálogo de endereços |
@@ -88,7 +100,7 @@ O plano original do projeto, com as decisões tomadas, está em [`plano-cliente-
 
 ## Limitações conhecidas
 
-- Sem OAuth (Outlook/Hotmail) por enquanto.
+- O login OAuth (Outlook, Hotmail e Live) só funciona depois de registrar o aplicativo na Microsoft.
 - A cópia local guarda as 100 mensagens mais recentes de cada pasta.
 - No Gmail, pastas são marcadores: apagar pela pasta "Todos os e-mails" age de forma diferente do esperado.
 - Fora do escopo desta versão: calendário e tarefas, filtros e regras, criptografia PGP, temas e versão para celular.

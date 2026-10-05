@@ -9,6 +9,8 @@ from email import policy
 from email.utils import parseaddr, parsedate_to_datetime
 from html.parser import HTMLParser
 
+import oauth
+
 LIMITE_MENSAGENS = 100
 ESPERA_APOS_LOGIN_RECUSADO = 30 * 60  # segundos
 
@@ -162,14 +164,16 @@ class ImapClient:
     def __init__(self):
         self.conn = None
         self.lock = threading.RLock()
-        self.host = self.porta = self.usuario = self.senha = None
+        self.host = self.porta = self.usuario = self.senha = self.token = None
         self.login_recusado = None  # (erro, quando): o servidor recusou o login
 
-    def configurar(self, host, porta, usuario, senha):
+    def configurar(self, host, porta, usuario, senha, token=None):
+        """'token' (função que devolve o token de acesso) faz o login por OAuth no lugar da senha."""
         with self.lock:
             self._fechar()
             self.login_recusado = None
             self.host, self.porta, self.usuario, self.senha = host, porta, usuario, senha
+            self.token = token
 
     def _fechar(self):
         if self.conn:
@@ -186,9 +190,19 @@ class ImapClient:
             for tentativa in (0, 1):
                 try:
                     if self.conn is None:
+                        cadeia = None
+                        if self.token:
+                            try:
+                                cadeia = oauth.cadeia_xoauth2(self.usuario, self.token())
+                            except oauth.ErroOAuth as e:
+                                self.login_recusado = (imaplib.IMAP4.error(str(e)), time.time())
+                                raise self.login_recusado[0]
                         c = imaplib.IMAP4_SSL(self.host, self.porta, timeout=30)
                         try:
-                            c.login(self.usuario, self.senha)
+                            if cadeia:
+                                c.authenticate("XOAUTH2", oauth.autenticador(cadeia))
+                            else:
+                                c.login(self.usuario, self.senha)
                         except imaplib.IMAP4.error as e:
                             self.login_recusado = (e, time.time())
                             raise
