@@ -92,3 +92,7 @@ O plano original do projeto, com as decisões tomadas, está em [`plano-cliente-
 - A cópia local guarda as 100 mensagens mais recentes de cada pasta.
 - No Gmail, pastas são marcadores: apagar pela pasta "Todos os e-mails" age de forma diferente do esperado.
 - Fora do escopo desta versão: calendário e tarefas, filtros e regras, criptografia PGP, temas e versão para celular.
+
+## Licença
+
+Distribuído sob a licença [Apache 2.0](LICENSE).
