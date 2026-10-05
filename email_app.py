@@ -14,7 +14,6 @@ import wx.html2
 
 import config
 import mailer
-import oauth
 import opcoes_dialog
 from avisos import APP_NAME, avisar
 from cache import Cache
@@ -40,26 +39,21 @@ class AccountDialog(wx.Dialog):
         super().__init__(parent, title="Conta de e-mail")
         self.conta = conta
         self.host_automatico = True
-        # Login pelo navegador (OAuth): e-mail para o qual há autorização e, se acabou
-        # de ser feita, o token de renovação a guardar.
-        self.email_oauth = conta["email"] if conta and conta.get("auth") == "oauth" else None
-        self.refresh = None
 
         aviso = wx.StaticText(
             self,
-            label="Para Outlook, Hotmail e Live, digite o e-mail e use o botão Entrar pelo navegador, "
-            "sem precisar de senha. Para os outros provedores, use a senha. No Gmail, não use a senha "
-            "normal, e sim uma senha de app: ative a verificação em duas etapas na sua conta Google, "
-            "abra o link abaixo, dê um nome, por exemplo Simple Email, clique em Criar e cole no campo "
-            "Senha a senha de 16 letras.",
+            label="Para Gmail, não use a senha normal. Use uma senha de app: "
+            "1) ative a verificação em duas etapas na sua conta Google; "
+            "2) abra o link abaixo e entre na sua conta; "
+            "3) dê um nome, por exemplo Simple Email, e clique em Criar; "
+            "4) copie a senha de 16 letras e cole no campo Senha. "
+            "Outlook e Hotmail podem não aceitar senha comum.",
         )
         aviso.Wrap(460)
         link = wx.adv.HyperlinkCtrl(
             self, label="Gerar senha de app do Gmail",
             url="https://myaccount.google.com/apppasswords", name="Gerar senha de app do Gmail",
         )
-        self.botao_oauth = wx.Button(self, label="Entrar pelo na&vegador (Outlook e Hotmail)")
-        self.botao_oauth.Bind(wx.EVT_BUTTON, self.on_oauth)
 
         # Cada rótulo é criado logo antes do seu campo: é assim que o NVDA
         # associa o nome ao campo.
@@ -86,7 +80,6 @@ class AccountDialog(wx.Dialog):
         raiz.Add(aviso, 0, wx.ALL, 12)
         raiz.Add(link, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
         raiz.Add(grade, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 12)
-        raiz.Add(self.botao_oauth, 0, wx.ALL, 12)
         raiz.Add(self.CreateStdDialogButtonSizer(wx.OK | wx.CANCEL), 0, wx.ALL | wx.ALIGN_RIGHT, 12)
         self.SetSizerAndFit(raiz)
 
@@ -98,7 +91,7 @@ class AccountDialog(wx.Dialog):
             self.smtp.SetValue(conta.get("smtp_host", ""))
             self.smtp_porta.SetValue(str(conta.get("smtp_porta", 465)))
             self.host_automatico = False
-            self.senha.SetHint("Deixe em branco para manter o login atual")
+            self.senha.SetHint("Deixe em branco para manter a senha atual")
 
         self.email.Bind(wx.EVT_KILL_FOCUS, self.on_email_perdeu_foco)
         self.host.Bind(wx.EVT_TEXT, lambda e: setattr(self, "host_automatico", False)
@@ -128,59 +121,9 @@ class AccountDialog(wx.Dialog):
             return self._erro("Digite o servidor SMTP.", self.smtp)
         if not self.smtp_porta.GetValue().strip().isdigit():
             return self._erro("A porta SMTP deve ser um número.", self.smtp_porta)
-        if self._usa_oauth():
-            if email != self.email_oauth:
-                return self._erro("O e-mail mudou depois do login pelo navegador. "
-                                  "Use o botão Entrar pelo navegador de novo.", self.botao_oauth)
-        elif not senha and not (self.conta and self.conta.get("auth") != "oauth" and self.conta["email"] == email):
-            return self._erro("Digite a senha ou use o botão Entrar pelo navegador.", self.senha)
+        if not senha and not (self.conta and self.conta["email"] == email):
+            return self._erro("Digite a senha.", self.senha)
         evento.Skip()
-
-    def _usa_oauth(self):
-        """Digitar uma senha troca o login pelo navegador por senha comum."""
-        return bool(self.email_oauth) and not self.senha.GetValue()
-
-    def on_oauth(self, evento):
-        email = self.email.GetValue().strip()
-        if not email or "@" not in email:
-            return self._erro("Digite primeiro o seu endereço de e-mail.", self.email)
-        if not oauth.suporta(email):
-            return self._erro("O login pelo navegador está disponível para Outlook, Hotmail e Live. "
-                              "Para os outros provedores, use a senha.", self.email)
-        cancelar, saida = threading.Event(), {}
-
-        espera = wx.Dialog(self, title="Entrar pelo navegador")
-        texto = wx.StaticText(
-            espera, label="O navegador foi aberto na página de login da Microsoft. Entre na conta "
-            f"{email}, aceite o acesso e volte aqui. Esta janela fecha sozinha ao terminar. "
-            "Para desistir, use Cancelar.")
-        texto.Wrap(420)
-        caixa = wx.BoxSizer(wx.VERTICAL)
-        caixa.Add(texto, 0, wx.ALL, 12)
-        caixa.Add(espera.CreateStdDialogButtonSizer(wx.CANCEL), 0, wx.ALL | wx.ALIGN_RIGHT, 12)
-        espera.SetSizerAndFit(caixa)
-
-        def trabalho():
-            try:
-                saida["refresh"] = oauth.autorizar(email, cancelar)
-            except Exception as e:  # noqa: BLE001
-                saida["erro"] = e
-            if not cancelar.is_set():
-                wx.CallAfter(espera.EndModal, wx.ID_OK)
-
-        threading.Thread(target=trabalho, daemon=True).start()
-        if espera.ShowModal() != wx.ID_OK:
-            cancelar.set()
-        espera.Destroy()
-        if cancelar.is_set():
-            return
-        if "erro" in saida:
-            return self._erro(str(saida["erro"]), self.botao_oauth)
-        self.email_oauth, self.refresh = email, saida["refresh"]
-        self.senha.SetValue("")
-        wx.MessageBox("Login na Microsoft concluído. Clique em OK para salvar a conta.",
-                      "Conta de e-mail", wx.OK | wx.ICON_INFORMATION, self)
-        self.FindWindowById(wx.ID_OK, self).SetFocus()
 
     def _erro(self, texto, campo):
         wx.MessageBox(texto, "Conta de e-mail", wx.OK | wx.ICON_WARNING, self)
@@ -195,10 +138,6 @@ class AccountDialog(wx.Dialog):
             "host": self.host.GetValue().strip(),
             "porta": int(self.porta.GetValue()),
         }
-        if self._usa_oauth():
-            conta["auth"] = "oauth"
-        else:
-            self.refresh = None
         return conta, self.senha.GetValue()
 
 
@@ -572,9 +511,8 @@ class MainFrame(wx.Frame):
             c = self.clientes.get(conta["email"])
             if c is None:
                 c = ImapClient()
-                token = (lambda conta=conta: oauth.token_de_acesso(conta)) if conta.get("auth") == "oauth" else None
                 c.configurar(conta["host"], conta["porta"], conta["email"],
-                             "" if token else config.obter_senha(conta["email"]), token)
+                             config.obter_senha(conta["email"]))
                 self.clientes[conta["email"]] = c
             return c
 
@@ -841,7 +779,7 @@ class MainFrame(wx.Frame):
                               wx.OK | wx.ICON_INFORMATION, dlg)
             else:
                 try:
-                    config.salvar_conta(conta, senha, refresh=dlg.refresh)
+                    config.salvar_conta(conta, senha)
                 except Exception as e:  # noqa: BLE001
                     dlg.Destroy()
                     return self._erro(e)
@@ -854,7 +792,7 @@ class MainFrame(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             conta, senha = dlg.resultado()
             try:
-                config.salvar_conta(conta, senha or None, antigo=antiga["email"], refresh=dlg.refresh)
+                config.salvar_conta(conta, senha or None, antigo=antiga["email"])
             except Exception as e:  # noqa: BLE001
                 dlg.Destroy()
                 return self._erro(e)

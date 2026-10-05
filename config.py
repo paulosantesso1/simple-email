@@ -57,10 +57,8 @@ def _gravar_contas(contas):
         json.dump({"contas": contas}, f, ensure_ascii=False, indent=2)
 
 
-def salvar_conta(conta, senha=None, antigo=None, refresh=None):
-    """Adiciona a conta ou, se 'antigo' (e-mail anterior) existir, a substitui.
-
-    'refresh' é o token de renovação do OAuth, guardado no lugar da senha."""
+def salvar_conta(conta, senha=None, antigo=None):
+    """Adiciona a conta ou, se 'antigo' (e-mail anterior) existir, a substitui."""
     contas = carregar_contas()
     alvo = antigo or conta["email"]
     for i, c in enumerate(contas):
@@ -72,12 +70,8 @@ def salvar_conta(conta, senha=None, antigo=None, refresh=None):
     _gravar_contas(contas)
     if senha:
         keyring.set_password(SERVICO, conta["email"], senha)
-    if refresh:
-        salvar_refresh(conta["email"], refresh)
     if antigo and antigo != conta["email"]:
         _esquecer_senha(antigo)
-    if conta.get("auth") != "oauth":
-        _esquecer_refresh(conta["email"])  # passou a usar senha
 
 
 def remover_conta(email):
@@ -86,35 +80,14 @@ def remover_conta(email):
 
 
 def _esquecer_senha(email):
-    for usuario in (email, _usuario_oauth(email)):
-        try:
-            keyring.delete_password(SERVICO, usuario)
-        except Exception:  # noqa: BLE001 - não havia nada guardado
-            pass
-
-
-def _esquecer_refresh(email):
     try:
-        keyring.delete_password(SERVICO, _usuario_oauth(email))
-    except Exception:  # noqa: BLE001 - não havia nada guardado
+        keyring.delete_password(SERVICO, email)
+    except Exception:  # noqa: BLE001 - não havia senha guardada
         pass
 
 
 def obter_senha(email):
     return keyring.get_password(SERVICO, email) or ""
-
-
-# O token de renovação do OAuth fica no mesmo cofre, sob outro nome de usuário.
-def _usuario_oauth(email):
-    return f"{email}#oauth"
-
-
-def salvar_refresh(email, token):
-    keyring.set_password(SERVICO, _usuario_oauth(email), token)
-
-
-def obter_refresh(email):
-    return keyring.get_password(SERVICO, _usuario_oauth(email)) or ""
 
 
 # ---------- opções do programa (separadas da conta) ----------
