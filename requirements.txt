@@ -1,0 +1,2 @@
+keyring==25.7.0
+wxPython==4.3.1
