@@ -7,7 +7,6 @@ import wx
 
 import contatos
 import mailer
-from avisos import avisar
 from contatos_dialog import CompletadorContatos, EscolherContatosDialog
 
 ID_RASCUNHO = wx.NewIdRef()
@@ -73,7 +72,7 @@ class CampoEnderecos:
         self.dialogo.Layout()
 
     # ---------- ações ----------
-    def confirmar(self, avisar_quem_entrou=True):
+    def confirmar(self):
         """Enter: o que foi digitado vira item da lista. Devolve False se o endereço é inválido."""
         digitado = self.texto.GetValue().strip()
         if not digitado:
@@ -84,11 +83,8 @@ class CampoEnderecos:
                           wx.OK | wx.ICON_WARNING, self.dialogo)
             self.texto.SetFocus()
             return False
-        entraram = self.adicionar(_enderecos_de(digitado))
+        self.adicionar(_enderecos_de(digitado))
         self.texto.SetValue("")
-        if avisar_quem_entrou:
-            avisar(f"Adicionado em {self.nome}." if entraram else "Esse endereço já estava na lista.",
-                   self.dialogo)
         return True
 
     def remover_selecionados(self):
@@ -102,11 +98,10 @@ class CampoEnderecos:
         self._atualizar(escolhidos[0])
         if self.itens:
             self.lista.SetFocus()
-        avisar("Deletado." if len(escolhidos) == 1 else f"{len(escolhidos)} deletados.", self.dialogo)
 
     def on_tecla(self, evento):
         k = evento.GetKeyCode()
-        if k == wx.WXK_DELETE:
+        if k in (wx.WXK_DELETE, wx.WXK_NUMPAD_DELETE):
             self.remover_selecionados()
         elif evento.ControlDown() and k in (ord("A"), ord("a")):
             for i in range(self.lista.GetCount()):
@@ -119,7 +114,7 @@ class CampoEnderecos:
         digitado = self.texto.GetValue().strip()
         # Ao sair do campo, o que foi digitado entra na lista, se for um endereço válido.
         if digitado and not mailer.validar_enderecos(digitado) and mailer.destinatarios(digitado):
-            wx.CallAfter(self.confirmar, False)
+            wx.CallAfter(self.confirmar)
 
 
 class ComposeDialog(wx.Dialog):
@@ -257,7 +252,7 @@ class ComposeDialog(wx.Dialog):
 
     def _confirmar_enderecos(self):
         """O que ainda está digitado nos campos de endereço entra nas listas antes de enviar."""
-        return all(c.confirmar(False) for c in self.enderecos.values())
+        return all(c.confirmar() for c in self.enderecos.values())
 
     def on_enviar(self, evento):
         if not self._confirmar_enderecos():
@@ -322,7 +317,7 @@ class ComposeDialog(wx.Dialog):
 
     def on_tecla_anexos(self, evento):
         k = evento.GetKeyCode()
-        if k == wx.WXK_DELETE:
+        if k in (wx.WXK_DELETE, wx.WXK_NUMPAD_DELETE):
             self.on_remover(None)
         elif evento.ControlDown() and k in (ord("A"), ord("a")):
             for i in range(self.lista_anexos.GetCount()):
