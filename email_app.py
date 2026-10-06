@@ -568,6 +568,8 @@ class MainFrame(wx.Frame):
             self._item(m_msg, "&Abrir", lambda e: self._abrir(self.lista.GetFirstSelected()))
             m_msg.AppendSeparator()
         self._item(m_msg, "&Responder\tCtrl+R", lambda e: self.responder("responder"))
+        self._item(m_msg, "Responder a uma mensagem da &conversa...\tAlt+R",
+                   lambda e: self.responder("responder", escolher=True))
         self._item(m_msg, "Responder a &todos\tCtrl+Shift+R", lambda e: self.responder("todos"))
         self._item(m_msg, "&Encaminhar\tCtrl+L", lambda e: self.responder("encaminhar"))
         m_msg.AppendSeparator()
@@ -1457,12 +1459,31 @@ class MainFrame(wx.Frame):
                         lambda _: (self._recarregar_pastas(), avisar(f"Pasta {pasta['nome']} apagada.", self)))
 
     # ---------- escrever e enviar ----------
-    def responder(self, acao):
+    def _escolher_da_conversa(self, linha):
+        """Pergunta a qual mensagem da conversa responder. Devolve a escolhida ou None."""
+        grupo = linha["grupo"]  # da mais nova para a mais antiga
+        antigas_primeiro = opcoes_dialog.opcao("ordem_conversa") == "antigas"
+        ordem = list(reversed(grupo)) if antigas_primeiro else list(grupo)
+        dlg = wx.SingleChoiceDialog(
+            self, "Responder a qual mensagem?", "Responder na conversa",
+            [f"{x['remetente']}; {x['data']}" for x in ordem])
+        dlg.SetSelection(ordem.index(grupo[0]))  # começa na mais nova
+        escolhida = ordem[dlg.GetSelection()] if dlg.ShowModal() == wx.ID_OK else None
+        dlg.Destroy()
+        if escolhida is None:
+            self.lista.SetFocus()
+        return escolhida
+
+    def responder(self, acao, escolher=False):
         i = self.lista.GetFirstSelected()
         if i == wx.NOT_FOUND or not self.mensagens:
             return wx.MessageBox("Selecione uma mensagem na lista primeiro.", APP_NAME,
                                  wx.OK | wx.ICON_INFORMATION, self)
         m = self.mensagens[i]
+        if escolher and len(m["grupo"]) > 1:
+            m = self._escolher_da_conversa(m)
+            if m is None:
+                return
         pasta = self.pastas_info[self._indice_exibido()]
         self.SetStatusText("Preparando mensagem...")
 

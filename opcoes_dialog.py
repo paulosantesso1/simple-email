@@ -37,7 +37,8 @@ Delete ..... mover para a Lixeira
 Shift+Delete ..... apagar de vez
 Ctrl+Shift+M ..... mover para outra pasta
 Ctrl+Q / Ctrl+U ..... marcar como lida / não lida
-Ctrl+R ..... responder
+Ctrl+R ..... responder (numa conversa agrupada, à mensagem mais nova)
+Alt+R ..... escolher a qual mensagem da conversa responder
 Ctrl+Shift+R ..... responder a todos
 Ctrl+L ..... encaminhar
 Ctrl+Shift+A ..... salvar remetente como contato
