@@ -13,6 +13,7 @@ import wx.adv
 import wx.html2
 
 import config
+import conversas
 import mailer
 import opcoes_dialog
 from avisos import APP_NAME, avisar
@@ -30,7 +31,13 @@ _ctx = threading.local()
 
 def texto_da_linha(m):
     """Texto lido pelo NVDA: 'Não lida, ' só aparece enquanto a mensagem não foi lida."""
-    base = f"{m['remetente']}; Assunto: {m['assunto']}; Data: {m['data']}"
+    n = len(m["grupo"])
+    base = f"{m['remetente']}; Assunto: {m['assunto']}; "
+    if n > 1:
+        base += f"{n} mensagens; "
+        if m["nao_lidas"]:
+            return f"{m['nao_lidas']} não lida{'s' if m['nao_lidas'] > 1 else ''}, {base}Data: {m['data']}"
+    base += f"Data: {m['data']}"
     return base if m["lida"] else f"Não lida, {base}"
 
 
@@ -180,7 +187,7 @@ class MessageDialog(wx.Dialog):
         cabecalho = f"De: {dados['de']}\nPara: {dados['para']}\nAssunto: {dados['assunto']}\nData: {dados['data']}\n"
         if dados["anexos"]:
             cabecalho += "Anexos: " + "; ".join(dados["anexos"]) + "\n"
-        completo = f"{cabecalho}\n{dados['texto']}"
+        completo = dados["texto"] if dados.get("conversa") else f"{cabecalho}\n{dados['texto']}"
         self.links = encontrar_links(completo)
 
         rotulo = wx.StaticText(self, label="&Mensagem")
@@ -256,7 +263,8 @@ class WebMessageDialog(wx.Dialog):
             'window.wx.postMessage("encaminhar");}});'
         )
         self.acao = None
-        self.anexos = mailer.anexos_originais(dados["raw"]) if dados.get("anexos") else []
+        self.anexos = [a for d in dados.get("conversa", [dados])
+                       for a in mailer.anexos_originais(d["raw"])] if dados.get("anexos") else []
         # Ordem do Tab: página, lista de anexos, baixar selecionado, baixar todos, botões.
         rot_anexos = wx.StaticText(self, label="A&nexos")
         self.lista_anexos = wx.ListBox(self, name="Anexos",
@@ -533,19 +541,7 @@ class MainFrame(wx.Frame):
         self._item(m_arquivo, "&Sair\tAlt+F4", lambda e: self.Close())
         barra.Append(m_arquivo, "&Arquivo")
 
-        m_msg = wx.Menu()
-        self._item(m_msg, "&Responder\tCtrl+R", lambda e: self.responder("responder"))
-        self._item(m_msg, "Responder a &todos\tCtrl+Shift+R", lambda e: self.responder("todos"))
-        self._item(m_msg, "&Encaminhar\tCtrl+L", lambda e: self.responder("encaminhar"))
-        m_msg.AppendSeparator()
-        self._item(m_msg, "&Apagar\tDelete", self.on_apagar)
-        self._item(m_msg, "Apagar de &vez\tShift+Delete", self.on_apagar_de_vez)
-        self._item(m_msg, "&Mover para...\tCtrl+Shift+M", lambda e: self.mover_mensagem())
-        self._item(m_msg, "&Salvar remetente como contato\tCtrl+Shift+A",
-                   lambda e: self.salvar_remetente_selecionado())
-        self._item(m_msg, "Marcar como &lida\tCtrl+Q", lambda e: self.marcar(True))
-        self._item(m_msg, "Marcar como &não lida\tCtrl+U", lambda e: self.marcar(False))
-        barra.Append(m_msg, "&Mensagem")
+        barra.Append(self._menu_mensagem(), "&Mensagem")
 
         m_pasta = wx.Menu()
         self._item(m_pasta, "&Nova pasta...", lambda e: self.nova_pasta())
@@ -564,6 +560,40 @@ class MainFrame(wx.Frame):
         self._item(m_ajuda, "&Sobre", self.on_sobre)
         barra.Append(m_ajuda, "A&juda")
         self.SetMenuBar(barra)
+
+    def _menu_mensagem(self, abrir=False):
+        """Menu Mensagem; com abrir=True (menu de contexto da lista) começa por 'Abrir'."""
+        m_msg = wx.Menu()
+        if abrir:
+            self._item(m_msg, "&Abrir", lambda e: self._abrir(self.lista.GetFirstSelected()))
+            m_msg.AppendSeparator()
+        self._item(m_msg, "&Responder\tCtrl+R", lambda e: self.responder("responder"))
+        self._item(m_msg, "Responder a &todos\tCtrl+Shift+R", lambda e: self.responder("todos"))
+        self._item(m_msg, "&Encaminhar\tCtrl+L", lambda e: self.responder("encaminhar"))
+        m_msg.AppendSeparator()
+        self._item(m_msg, "&Apagar\tDelete", self.on_apagar)
+        self._item(m_msg, "Apagar de &vez\tShift+Delete", self.on_apagar_de_vez)
+        self._item(m_msg, "&Mover para...\tCtrl+Shift+M", lambda e: self.mover_mensagem())
+        self._item(m_msg, "&Salvar remetente como contato\tCtrl+Shift+A",
+                   lambda e: self.salvar_remetente_selecionado())
+        self._item(m_msg, "Marcar como &lida\tCtrl+Q", lambda e: self.marcar(True))
+        self._item(m_msg, "Marcar como &não lida\tCtrl+U", lambda e: self.marcar(False))
+        return m_msg
+
+    def on_menu_lista(self, evento):
+        """Tecla Aplicativos, Shift+F10 ou botão direito: o menu da mensagem selecionada."""
+        i = self.lista.GetFirstSelected()
+        if i == wx.NOT_FOUND:
+            return
+        pos = evento.GetPosition()
+        if pos == wx.DefaultPosition:  # veio do teclado: abre junto da mensagem selecionada
+            ret = self.lista.GetItemRect(i)
+            pos = wx.Point(ret.x + 20, ret.y + ret.height)
+        else:
+            pos = self.lista.ScreenToClient(pos)
+        menu = self._menu_mensagem(abrir=True)
+        self.lista.PopupMenu(menu, pos)
+        menu.Destroy()
 
     def _item(self, menu, texto, handler):
         item = menu.Append(wx.ID_ANY, texto)
@@ -601,6 +631,7 @@ class MainFrame(wx.Frame):
         self.lista.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_abrir)
         self.lista.Bind(wx.EVT_SIZE, self.on_lista_tamanho)
         self.lista.Bind(wx.EVT_KEY_DOWN, self.on_tecla_lista)
+        self.lista.Bind(wx.EVT_CONTEXT_MENU, self.on_menu_lista)
 
     def on_tecla_lista(self, evento):
         """Ctrl+A seleciona todas as mensagens da pasta."""
@@ -1030,8 +1061,12 @@ class MainFrame(wx.Frame):
     def abrir_opcoes(self):
         dlg = OpcoesDialog(self)
         if dlg.ShowModal() == wx.ID_OK:
+            antes = self._agrupando()
             dlg.salvar()
             self._reiniciar_timer()
+            if antes != self._agrupando() and self._indice_exibido() != wx.NOT_FOUND:
+                self.pasta_exibida = None  # força refazer a lista, agora com ou sem agrupamento
+                self._carregar_pasta(self._indice_exibido())
         dlg.Destroy()
 
     def mostrar_atalhos(self):
@@ -1047,11 +1082,15 @@ class MainFrame(wx.Frame):
         """Mostra a lista. Se nada mudou, não mexe; se mudou, mantém a mensagem selecionada."""
         mesma_pasta = self.pasta_exibida == pasta["raw"]
         n = len(msgs)
+        agrupar = self._agrupando() and pasta["nome"] != "Rascunhos"  # rascunho abre para editar
+        msgs = conversas.agrupar(msgs, agrupar)
         sufixo = "" if atualizado else " (cópia local)"
         self.SetStatusText(
             f"{pasta['nome']}: {n} mensagem{sufixo}" if n == 1
-            else f"{pasta['nome']}: {n} mensagens{sufixo}")
-        chave = lambda lista: [(m["uid"], m["lida"], m["assunto"]) for m in lista]  # noqa: E731
+            else f"{pasta['nome']}: {n} mensagens em {len(msgs)} conversas{sufixo}"
+            if len(msgs) != n else f"{pasta['nome']}: {n} mensagens{sufixo}")
+        chave = lambda lista: [(m["uid"], m["nao_lidas"], m["assunto"], len(m["grupo"]))  # noqa: E731
+                               for m in lista]
         if mesma_pasta and chave(self.mensagens) == chave(msgs):
             self.mensagens = msgs
             return
@@ -1089,8 +1128,15 @@ class MainFrame(wx.Frame):
             return self.conectar()
         self._carregar_pasta(i)
 
+    def _agrupando(self):
+        return bool(opcoes_dialog.opcao("agrupar_mensagens"))
+
     def on_abrir(self, evento):
-        i = evento.GetIndex()
+        self._abrir(evento.GetIndex())
+
+    def _abrir(self, i):
+        if i == wx.NOT_FOUND or i >= len(self.mensagens):
+            return
         m = self.mensagens[i]
         pasta = self.pastas_info[self._indice_exibido()]
         self.SetStatusText("Abrindo mensagem...")
@@ -1098,6 +1144,13 @@ class MainFrame(wx.Frame):
             return self._em_thread(
                 lambda: self._obter_mensagem(pasta, m),
                 lambda dados: self._editar_rascunho(pasta, m, dados),
+            )
+        if len(m["grupo"]) > 1:  # conversa: lê todas as mensagens e mostra numa página só
+            antigas_primeiro = opcoes_dialog.opcao("ordem_conversa") == "antigas"
+            return self._em_thread(
+                lambda: conversas.juntar([self._obter_mensagem(pasta, x) for x in m["grupo"]],
+                                         antigas_primeiro),
+                lambda dados: self._mostrar_mensagem(i, m, dados),
             )
         self._em_thread(
             lambda: self._obter_mensagem(pasta, m),
@@ -1107,13 +1160,13 @@ class MainFrame(wx.Frame):
     def _marcar_linha_lida(self, uid):
         """Mostra como lida a mensagem de UID dado, onde quer que ela esteja na lista agora."""
         for i, m in enumerate(self.mensagens):
-            if m["uid"] == uid:
-                m["lida"] = True
+            if conversas.marcar_lida_uid(m, uid):
                 self.lista.SetItemText(i, texto_da_linha(m))
                 return
 
     def _mostrar_mensagem(self, i, m, dados):
-        self._marcar_linha_lida(m["uid"])
+        for x in list(m["grupo"]):
+            self._marcar_linha_lida(x["uid"])
         self.SetStatusText("")
         dlg = (WebMessageDialog if web_disponivel() else MessageDialog)(self, dados)
         dlg.ShowModal()
@@ -1249,6 +1302,7 @@ class MainFrame(wx.Frame):
         if not sel:
             return
         indices, msgs, pasta = sel
+        msgs = conversas.todas(msgs)  # numa conversa agrupada, vale para todas as mensagens dela
         n = len(msgs)
         lixeira = self._pasta_raw("Lixeira")
         definitivo = de_vez or pasta["nome"] == "Lixeira" or not lixeira or pasta["raw"] == lixeira
@@ -1284,6 +1338,7 @@ class MainFrame(wx.Frame):
         if not sel:
             return
         indices, msgs, pasta = sel
+        msgs = conversas.todas(msgs)
         n = len(msgs)
         destinos = [p for p in self.pastas_info if p["raw"] != pasta["raw"]]
         dlg = wx.SingleChoiceDialog(
@@ -1308,10 +1363,11 @@ class MainFrame(wx.Frame):
         sel = self._selecao()
         if not sel:
             return
-        indices, msgs, pasta = sel
-        for i, m in zip(indices, msgs):
-            m["lida"] = lida
+        indices, linhas, pasta = sel
+        for i, m in zip(indices, linhas):
+            conversas.definir_lida(m, lida)
             self.lista.SetItemText(i, texto_da_linha(m))
+        msgs = conversas.todas(linhas)
         self.cache.marcar_lida(self.conta["email"], pasta["raw"], [m["uid"] for m in msgs], lida)
         n = len(msgs)
         estado = "lida" if lida else "não lida"

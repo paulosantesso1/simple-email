@@ -9,7 +9,12 @@ PADROES = {
     "avisar_com_janela": True,
     "avisar_com_notificacao": True,
     "perguntar_apagar_de_vez": True,
+    "agrupar_mensagens": False,
+    "ordem_conversa": "antigas",
 }
+
+ORDENS = (("antigas", "Da mais antiga para a mais nova"),
+          ("novas", "Da mais nova para a mais antiga"))
 
 ATALHOS = """\
 GERAL
@@ -36,6 +41,9 @@ Ctrl+R ..... responder
 Ctrl+Shift+R ..... responder a todos
 Ctrl+L ..... encaminhar
 Ctrl+Shift+A ..... salvar remetente como contato
+Tecla Aplicativos ou Shift+F10 ..... menu da mensagem (abrir, responder, apagar...)
+Com o agrupamento ligado (Ferramentas, Opções), uma conversa é uma linha só: Enter abre
+todas as mensagens dela numa página, e Delete, mover e marcar valem para a conversa inteira
 
 NA JANELA DA MENSAGEM
 H, K e as outras teclas de navegação do NVDA funcionam no texto
@@ -71,12 +79,22 @@ class OpcoesDialog(wx.Dialog):
         self.notificacao.SetValue(bool(opcao("avisar_com_notificacao")))
         self.perguntar = wx.CheckBox(self, label="&Perguntar antes de apagar mensagens de vez")
         self.perguntar.SetValue(bool(opcao("perguntar_apagar_de_vez")))
+        self.agrupar = wx.CheckBox(
+            self, label="A&grupar mensagens da mesma conversa numa linha só")
+        self.agrupar.SetValue(bool(opcao("agrupar_mensagens")))
+        r2 = wx.StaticText(self, label="&Ordem das mensagens dentro de uma conversa agrupada:")
+        self.ordem = wx.Choice(self, choices=[t for _, t in ORDENS],
+                               name="Ordem das mensagens agrupadas")
+        atual = opcao("ordem_conversa")
+        self.ordem.SetSelection(next((i for i, (k, _) in enumerate(ORDENS) if k == atual), 0))
 
         raiz = wx.BoxSizer(wx.VERTICAL)
         raiz.Add(r1, 0, wx.LEFT | wx.RIGHT | wx.TOP, 12)
         raiz.Add(self.intervalo, 0, wx.ALL, 12)
-        for c in (self.som, self.janela, self.notificacao, self.perguntar):
+        for c in (self.som, self.janela, self.notificacao, self.perguntar, self.agrupar):
             raiz.Add(c, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
+        raiz.Add(r2, 0, wx.LEFT | wx.RIGHT, 12)
+        raiz.Add(self.ordem, 0, wx.ALL, 12)
         raiz.Add(self.CreateStdDialogButtonSizer(wx.OK | wx.CANCEL), 0, wx.ALL | wx.ALIGN_RIGHT, 12)
         self.SetSizerAndFit(raiz)
         self.intervalo.SetFocus()
@@ -87,6 +105,8 @@ class OpcoesDialog(wx.Dialog):
         config.salvar_opcao("avisar_com_janela", self.janela.GetValue())
         config.salvar_opcao("avisar_com_notificacao", self.notificacao.GetValue())
         config.salvar_opcao("perguntar_apagar_de_vez", self.perguntar.GetValue())
+        config.salvar_opcao("agrupar_mensagens", self.agrupar.GetValue())
+        config.salvar_opcao("ordem_conversa", ORDENS[self.ordem.GetSelection()][0])
 
 
 class AtalhosDialog(wx.Dialog):
