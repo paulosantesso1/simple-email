@@ -104,7 +104,7 @@ class AccountDialog(wx.Dialog):
         self.host.Bind(wx.EVT_TEXT, lambda e: setattr(self, "host_automatico", False)
                        if self.FindFocus() is self.host else None)
         self.Bind(wx.EVT_BUTTON, self.on_ok, id=wx.ID_OK)
-        self.email.SetFocus()
+        self.nome.SetFocus()
 
     def on_email_perdeu_foco(self, evento):
         evento.Skip()
