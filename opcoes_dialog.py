@@ -11,6 +11,7 @@ PADROES = {
     "perguntar_apagar_de_vez": True,
     "agrupar_mensagens": False,
     "ordem_conversa": "antigas",
+    "minimizar_para_bandeja": False,
 }
 
 ORDENS = (("antigas", "Da mais antiga para a mais nova"),
@@ -83,6 +84,10 @@ class OpcoesDialog(wx.Dialog):
         self.agrupar = wx.CheckBox(
             self, label="A&grupar mensagens da mesma conversa numa linha só")
         self.agrupar.SetValue(bool(opcao("agrupar_mensagens")))
+        self.bandeja = wx.CheckBox(
+            self, label="Ao fechar (Alt+F4), ir para a &bandeja do sistema em vez de sair, "
+            "e avisar de e-mail novo em tempo real")
+        self.bandeja.SetValue(bool(opcao("minimizar_para_bandeja")))
         r2 = wx.StaticText(self, label="&Ordem das mensagens dentro de uma conversa agrupada:")
         self.ordem = wx.Choice(self, choices=[t for _, t in ORDENS],
                                name="Ordem das mensagens agrupadas")
@@ -92,7 +97,7 @@ class OpcoesDialog(wx.Dialog):
         raiz = wx.BoxSizer(wx.VERTICAL)
         raiz.Add(r1, 0, wx.LEFT | wx.RIGHT | wx.TOP, 12)
         raiz.Add(self.intervalo, 0, wx.ALL, 12)
-        for c in (self.som, self.janela, self.notificacao, self.perguntar, self.agrupar):
+        for c in (self.som, self.janela, self.notificacao, self.perguntar, self.agrupar, self.bandeja):
             raiz.Add(c, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
         raiz.Add(r2, 0, wx.LEFT | wx.RIGHT, 12)
         raiz.Add(self.ordem, 0, wx.ALL, 12)
@@ -108,6 +113,7 @@ class OpcoesDialog(wx.Dialog):
         config.salvar_opcao("perguntar_apagar_de_vez", self.perguntar.GetValue())
         config.salvar_opcao("agrupar_mensagens", self.agrupar.GetValue())
         config.salvar_opcao("ordem_conversa", ORDENS[self.ordem.GetSelection()][0])
+        config.salvar_opcao("minimizar_para_bandeja", self.bandeja.GetValue())
 
 
 class AtalhosDialog(wx.Dialog):

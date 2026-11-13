@@ -458,6 +458,33 @@ class ContasDialog(wx.Dialog):
         self.lista.SetFocus()
 
 
+class BandejaIcon(wx.adv.TaskBarIcon):
+    """Ícone na bandeja do sistema quando a janela principal está escondida."""
+
+    def __init__(self, principal):
+        super().__init__()
+        self.principal = principal
+        self.SetIcon(wx.ArtProvider.GetIcon(wx.ART_FOLDER, wx.ART_OTHER, (16, 16)), APP_NAME)
+        self.Bind(wx.adv.EVT_TASKBAR_LEFT_DCLICK, self.on_restaurar)
+        self.Bind(wx.EVT_MENU, self.on_restaurar, id=wx.ID_OPEN)
+        self.Bind(wx.EVT_MENU, self.on_sair, id=wx.ID_EXIT)
+
+    def CreatePopupMenu(self):
+        menu = wx.Menu()
+        menu.Append(wx.ID_OPEN, "&Abrir o Simple Email")
+        menu.AppendSeparator()
+        menu.Append(wx.ID_EXIT, "&Sair")
+        return menu
+
+    def on_restaurar(self, evento):
+        self.principal.Show()
+        self.principal.Iconize(False)
+        self.principal.Raise()
+
+    def on_sair(self, evento):
+        self.principal.sair_de_vez()
+
+
 class MainFrame(wx.Frame):
     def __init__(self):
         super().__init__(None, title=APP_NAME, size=(1000, 650))
@@ -479,6 +506,8 @@ class MainFrame(wx.Frame):
         self.timer_auto = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, lambda e: self.verificar_automatico(), self.timer_auto)
         self.Bind(wx.EVT_CLOSE, self.on_fechar)
+        self._bandeja = None
+        self._saindo_de_vez = False
 
         self._criar_menus()
         self._criar_controles()
@@ -1077,8 +1106,24 @@ class MainFrame(wx.Frame):
         dlg.Destroy()
 
     def on_fechar(self, evento):
+        if not self._saindo_de_vez and opcoes_dialog.opcao("minimizar_para_bandeja"):
+            evento.Veto()
+            self._ir_para_bandeja()
+            return
         self.timer_auto.Stop()
+        if self._bandeja:
+            self._bandeja.Destroy()
+            self._bandeja = None
         evento.Skip()
+
+    def _ir_para_bandeja(self):
+        if self._bandeja is None:
+            self._bandeja = BandejaIcon(self)
+        self.Hide()
+
+    def sair_de_vez(self):
+        self._saindo_de_vez = True
+        self.Close()
 
     def _mostrar_mensagens(self, pasta, msgs, atualizado=False):
         """Mostra a lista. Se nada mudou, não mexe; se mudou, mantém a mensagem selecionada."""
@@ -1653,8 +1698,18 @@ def _registrar_erros():
     threading.excepthook = lambda a: gancho(a.exc_type, a.exc_value, a.exc_traceback)
 
 
+def _identidade_windows():
+    """Identidade própria no Windows: as notificações aparecem como "Simple Email"."""
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SimpleEmail.App")
+    except (AttributeError, OSError):
+        pass
+
+
 def main():
     _registrar_erros()
+    _identidade_windows()
     app = wx.App(False)
     app.SetAppName(APP_NAME)
     MainFrame().Show()

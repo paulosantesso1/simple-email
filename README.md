@@ -34,6 +34,10 @@ python -m venv .venv
 
 Depois da instalação, o arquivo `Simple Email.bat` abre o programa sem janela de terminal.
 
+### Instalador para qualquer PC (sem Python)
+
+Execute `build.bat` (precisa de `pyinstaller` no `.venv` e do [Inno Setup 6](https://jrsoftware.org/isinfo.php)). Ele gera `instalador\SimpleEmail-Setup.exe`, que instala o programa completo (com o Python embutido, documentação e código-fonte), cria o atalho no Menu Iniciar e o desinstalador.
+
 ## Primeiro uso e contas
 
 Na primeira vez, o programa pede os dados da conta. Os servidores de Gmail, Outlook/Hotmail, Yahoo, UOL, BOL e Terra são preenchidos sozinhos.
